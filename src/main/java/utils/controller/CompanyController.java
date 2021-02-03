@@ -13,6 +13,8 @@ import static io.restassured.RestAssured.given;
 import static utils.Constant.COMPANY_URL;
 
 public class CompanyController {
+
+
     public void postCompany(Organization organization, String token) {
         given()
                 .header("Content-Type", ContentType.JSON)
@@ -71,7 +73,7 @@ public class CompanyController {
         return getCompaniesByNumberPage(token, admin, numberPage, sizePage);
     }
 
-    private boolean thisCompanyOnPage(Organization organization, CompanyResponse companyResponse) {
+    private boolean companyExistOnPage(Organization organization, CompanyResponse companyResponse) {
         return companyResponse.getResults()
                 .stream().anyMatch(i -> i.getCompanyName().contains(organization.getCompanyName()));
     }
@@ -79,22 +81,18 @@ public class CompanyController {
     private Result getCompanyByCompanyName(CompanyResponse companyResponse, Organization organization) {
         return companyResponse.getResults().stream()
                 .filter(i -> i.getCompanyName().contains(organization.getCompanyName()))
-                .findFirst().orElse(null);
-
+                .findFirst().orElseThrow(() -> new NoSuchElementException("Could not found company by name - " + organization.getCompanyName()));
     }
 
     public int getCompanyID(String token, Admin admin, Organization organization) {
-        int id = 0;
         boolean hasNextPage = true;
         for (int i = 1; hasNextPage; i++) {
             CompanyResponse companyResponsePage = getCompanyResponseByPageNumber(token, admin, i, 25);
-            boolean companyOnPage = thisCompanyOnPage(organization, companyResponsePage);
             hasNextPage = companyResponsePage.isHasNextPage();
-            if (companyOnPage) {
-                id = getCompanyByCompanyName(companyResponsePage, organization).getId();
-                return id;
+            if (companyExistOnPage(organization, companyResponsePage)) {
+                return getCompanyByCompanyName(companyResponsePage, organization).getId();
             }
         }
-        throw new NoSuchElementException("");
+        throw new NoSuchElementException("Could not found company by name - " + organization.getCompanyName());
     }
 }
