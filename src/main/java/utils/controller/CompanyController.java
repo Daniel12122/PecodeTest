@@ -1,15 +1,16 @@
 package utils.controller;
 
 import io.restassured.http.ContentType;
+import io.restassured.specification.RequestSpecification;
 import pojo.Admin;
 import pojo.companyResponse.CompanyResponse;
+import pojo.companyResponse.Result;
 import pojo.organization.Organization;
 
 import java.util.NoSuchElementException;
 
 import static io.restassured.RestAssured.given;
 import static utils.Constant.COMPANY_URL;
-
 
 public class CompanyController {
     public void postCompany(Organization organization, String token) {
@@ -25,7 +26,7 @@ public class CompanyController {
                 .response();
     }
 
-    public CompanyResponse getCompaniesByNumberPage(String token, Admin admin, int numberPage, int sizePage) {
+    private RequestSpecification returnDefaultGetSetup(String token, Admin admin) {
         return given()
                 .header("Content-Type", "application/x-www-form-urlencoded")
                 .header("Authorization", token)
@@ -33,7 +34,11 @@ public class CompanyController {
                 .param("password", admin.getPassword())
                 .param("grant_type", "password")
                 .param("scope", "api")
-                .urlEncodingEnabled(true)
+                .urlEncodingEnabled(true);
+    }
+
+    public CompanyResponse getCompaniesByNumberPage(String token, Admin admin, int numberPage, int sizePage) {
+        return returnDefaultGetSetup(token, admin)
                 .when()
                 .get(COMPANY_URL + "?page=" + numberPage + "&size=" + sizePage)
                 .then()
@@ -43,14 +48,7 @@ public class CompanyController {
     }
 
     public Organization getCompanyByID(String token, int id, Admin admin) {
-        return given()
-                .header("Content-Type ", "application/x-www-form-urlencoded")
-                .header("Authorization", token)
-                .param("username", admin.getEmail())
-                .param("password", admin.getPassword())
-                .param("grant_type", "password")
-                .param("scope", "api")
-                .urlEncodingEnabled(true)
+        return returnDefaultGetSetup(token, admin)
                 .when()
                 .get(COMPANY_URL + "/" + id)
                 .then()
@@ -60,14 +58,7 @@ public class CompanyController {
     }
 
     public int deleteCompanyByID(String token, int id, Admin admin) {
-        return given()
-                .header("Content-Type", "application/x-www-form-urlencoded")
-                .header("Authorization", token)
-                .param("username", admin.getEmail())
-                .param("password", admin.getPassword())
-                .param("grant_type", "password")
-                .param("scope", "api")
-                .urlEncodingEnabled(true)
+        return returnDefaultGetSetup(token, admin)
                 .when()
                 .delete(COMPANY_URL + "/" + id)
                 .then()
@@ -76,19 +67,19 @@ public class CompanyController {
                 .response().getStatusCode();
     }
 
-    public CompanyResponse getCompanyResponseByPageNumber(String token, Admin admin, int numberPage, int sizePage) {
+    private CompanyResponse getCompanyResponseByPageNumber(String token, Admin admin, int numberPage, int sizePage) {
         return getCompaniesByNumberPage(token, admin, numberPage, sizePage);
     }
 
-    public boolean searchCompanyOnPage(Organization organization, CompanyResponse companyResponse) {
+    private boolean thisCompanyOnPage(Organization organization, CompanyResponse companyResponse) {
         return companyResponse.getResults()
                 .stream().anyMatch(i -> i.getCompanyName().contains(organization.getCompanyName()));
     }
 
-    public int getCompanyThatFinding(CompanyResponse companyResponse, Organization organization) {
+    private Result getCompanyByCompanyName(CompanyResponse companyResponse, Organization organization) {
         return companyResponse.getResults().stream()
                 .filter(i -> i.getCompanyName().contains(organization.getCompanyName()))
-                .findFirst().get().getId();
+                .findFirst().orElse(null);
 
     }
 
@@ -97,12 +88,13 @@ public class CompanyController {
         boolean hasNextPage = true;
         for (int i = 1; hasNextPage; i++) {
             CompanyResponse companyResponsePage = getCompanyResponseByPageNumber(token, admin, i, 25);
-            boolean companyOnPage = searchCompanyOnPage(organization, companyResponsePage);
+            boolean companyOnPage = thisCompanyOnPage(organization, companyResponsePage);
+            hasNextPage = companyResponsePage.isHasNextPage();
             if (companyOnPage) {
-                id = getCompanyThatFinding(companyResponsePage, organization);
+                id = getCompanyByCompanyName(companyResponsePage, organization).getId();
                 return id;
             }
         }
-        throw new NoSuchElementException("Нихуя нема");
+        throw new NoSuchElementException("");
     }
 }

@@ -9,7 +9,6 @@ import pojo.organization.State;
 
 import java.util.Locale;
 
-
 public class OrganizationBuilder {
     private static Faker faker = new Faker(Locale.US);
 
